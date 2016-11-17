@@ -109,18 +109,10 @@ public class KafkaMain
 
     // set the critical Kafka configs again from TranquilityKafkaConfig so it picks up the defaults
     kafkaProperties.setProperty("group.id", globalConfig.getKafkaGroupId());
-    kafkaProperties.setProperty("zookeeper.connect", globalConfig.getKafkaZookeeperConnect());
-    if (kafkaProperties.setProperty(
-        "zookeeper.session.timeout.ms",
-        Long.toString(globalConfig.zookeeperTimeout().toStandardDuration().getMillis())
-    ) != null) {
-      throw new IllegalArgumentException(
-          "Set zookeeper.timeout instead of setting kafka.zookeeper.session.timeout.ms"
-      );
-    }
+    kafkaProperties.setProperty("bootstrap.servers", globalConfig.getKafkaBootstrapServers());
 
     final WriterController writerController = new WriterController(dataSourceConfigs);
-    final KafkaConsumer kafkaConsumer = new KafkaConsumer(
+    final Consumer consumer = new Consumer(
         globalConfig,
         kafkaProperties,
         dataSourceConfigs,
@@ -128,7 +120,7 @@ public class KafkaMain
     );
 
     try {
-      kafkaConsumer.start();
+      consumer.start();
     }
     catch (Throwable t) {
       log.error(t, "Error while starting up. Exiting.");
@@ -143,12 +135,12 @@ public class KafkaMain
               public void run()
               {
                 log.info("Initiating shutdown...");
-                kafkaConsumer.stop();
+                consumer.stop();
               }
             }
         )
     );
 
-    kafkaConsumer.join();
+    consumer.join();
   }
 }

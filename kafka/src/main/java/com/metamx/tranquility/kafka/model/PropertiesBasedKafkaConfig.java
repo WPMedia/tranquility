@@ -34,7 +34,7 @@ public abstract class PropertiesBasedKafkaConfig extends PropertiesBasedConfig
     super(
         ImmutableSet.of(
             "kafka.group.id",
-            "kafka.zookeeper.connect",
+            "kafka.bootstrap.servers",
             "consumer.numThreads",
             "commit.periodMillis"
         )
@@ -45,8 +45,8 @@ public abstract class PropertiesBasedKafkaConfig extends PropertiesBasedConfig
   @Default("tranquility-kafka")
   public abstract String getKafkaGroupId();
 
-  @Config("kafka.zookeeper.connect")
-  public abstract String getKafkaZookeeperConnect();
+  @Config("kafka.bootstrap.servers")
+  public abstract String getKafkaBootstrapServers();
 
   @Config("consumer.numThreads")
   @Default("-1")
@@ -75,4 +75,5 @@ public abstract class PropertiesBasedKafkaConfig extends PropertiesBasedConfig
   @Config("reportParseExceptions")
   @Default("false")
   public abstract Boolean reportParseExceptions();
+
 }

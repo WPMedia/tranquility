@@ -20,10 +20,10 @@ These Kafka-specific properties, if used, must be specified at the global level:
 
 |Property|Description|Default|
 |--------|-----------|-------|
-|`kafka.zookeeper.connect`|ZooKeeper connect string for Kafka.|none; must be provided|
+|`kafka.bootstrap.servers`|Initial broker list for connecting to Kafka cluster.|none; must be provided|
 |`kafka.group.id`|Group ID for Kafka consumers. **Note:** This must be the same for all instances to avoid data duplication!|tranquility-kafka|
-|`consumer.numThreads`|The number of threads that will be made available to the Kafka consumer for fetching messages.|{numProcessors} - 1|
-|`commit.periodMillis`|The frequency with which consumer offsets will be committed to ZooKeeper to track processed messages.|15000|
+|`consumer.numThreads`|The number of Kafka consumer threads for fetching messages.|{numProcessors} - 1|
+|`commit.periodMillis`|The frequency with which consumer offsets will be committed to Kafka to track processed messages.|15000|
 |`kafka.*`|Any properties that begin with *kafka.* will be passed to the underlying Kafka consumer with the *kafka.* prefix removed. For example, if you set `kafka.consumer.id=myConsumer`, the Kafka consumer will be passed the property `consumer.id=myConsumer`. Note that Tranquility Kafka requires `auto.commit.enable` to be *false* and any attempt to set this property will be overridden. |none|
 
 These Kafka-specific properties, if used, may be specified either at the global level or at the dataSource level:

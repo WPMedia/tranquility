@@ -41,13 +41,16 @@ import io.druid.segment.realtime.firehose.LocalFirehoseFactory;
 import io.druid.segment.realtime.plumber.Plumber;
 import io.druid.segment.realtime.plumber.PlumberSchool;
 import junit.framework.Assert;
-import kafka.common.OffsetMetadataAndError;
+
 import kafka.common.TopicAndPartition;
-import kafka.javaapi.OffsetFetchRequest;
-import kafka.javaapi.OffsetFetchResponse;
+import kafka.common.OffsetMetadataAndError;
+import kafka.api.OffsetFetchRequest;
+import kafka.api.OffsetFetchResponse;
 import kafka.network.BlockingChannel;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServerStartable;
+import scala.collection.JavaConversions;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.curator.test.TestingServer;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -107,9 +110,19 @@ public class KafkaConsumerTest
     consumerProperties = new Properties();
     consumerProperties.setProperty("group.id", GROUP_ID);
     consumerProperties.setProperty("zookeeper.connect", zk.getConnectString());
-    consumerProperties.setProperty("kafka.zookeeper.connect", zk.getConnectString());
+    consumerProperties.setProperty(
+        "kafka.bootstrap.servers",
+        String.format("%s:%s", kafka.serverConfig().hostName(), kafka.serverConfig().port())
+    );
+    consumerProperties.setProperty(
+        "bootstrap.servers",
+        String.format("%s:%s", kafka.serverConfig().hostName(), kafka.serverConfig().port())
+    );
     consumerProperties.setProperty("commit.periodMillis", "90000");
-    consumerProperties.setProperty("auto.offset.reset", "smallest");
+    consumerProperties.setProperty("auto.offset.reset", "earliest");
+    consumerProperties.setProperty("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    consumerProperties.setProperty("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    consumerProperties.setProperty("consumer.numThreads", "3");
   }
 
   @AfterClass
@@ -199,13 +212,13 @@ public class KafkaConsumerTest
     );
 
     // commitMillis is set high enough that the commit thread should not run during the test
-    KafkaConsumer kafkaConsumer = new KafkaConsumer(
+    Consumer consumer = new Consumer(
         config,
         consumerProperties,
         datasourceConfigs,
         mockWriterController
     );
-    kafkaConsumer.start();
+    consumer.start();
 
     Assert.assertEquals("Unexpected consumer offset", -1, getConsumerOffset(topic));
 
@@ -217,7 +230,7 @@ public class KafkaConsumerTest
     // check that offset wasn't committed since commit thread didn't run
     Assert.assertEquals("Unexpected consumer offset", -1, getConsumerOffset(topic));
 
-    kafkaConsumer.stop();
+    consumer.stop();
 
     // check that offset was committed on shutdown
     Assert.assertEquals("Unexpected consumer offset", numMessages, getConsumerOffset(topic));
@@ -284,13 +297,13 @@ public class KafkaConsumerTest
     );
 
     // commitMillis is set high enough that the commit thread should not run during the test
-    KafkaConsumer kafkaConsumer = new KafkaConsumer(
+    Consumer consumer = new Consumer(
         config,
         consumerProperties,
         datasourceConfigs,
         mockWriterController
     );
-    kafkaConsumer.start();
+    consumer.start();
 
     Assert.assertEquals("Unexpected consumer offset", -1, getConsumerOffset(topic));
 
@@ -299,12 +312,12 @@ public class KafkaConsumerTest
     }
     latch.await();
 
-    kafkaConsumer.commit();
+    consumer.commit();
 
     // check that offset was committed since commit ran
     Assert.assertEquals("Unexpected consumer offset", numMessages, getConsumerOffset(topic));
 
-    kafkaConsumer.stop();
+    consumer.stop();
 
     Assert.assertEquals("Unexpected consumer offset", numMessages, getConsumerOffset(topic));
     EasyMock.verify(mockWriterController, mockEventWriter);
@@ -312,10 +325,12 @@ public class KafkaConsumerTest
 
   private long getConsumerOffset(String topic)
   {
+    // FIXME Avoid older 'kafka.api' scala APIs
     TopicAndPartition partition = new TopicAndPartition(topic, 0);
     OffsetFetchRequest fetchRequest = new OffsetFetchRequest(
-        GROUP_ID, Lists.newArrayList(partition),
-        (short) 0, // version 1 and above fetch from Kafka, version 0 fetches from ZooKeeper
+        GROUP_ID, 
+        JavaConversions.asScalaBuffer(Lists.newArrayList(partition)),
+        (short) 1, // version 1 and above fetch from Kafka, version 0 fetches from ZooKeeper
         0, CLIENT_ID
     );
 
@@ -323,10 +338,10 @@ public class KafkaConsumerTest
       channel.connect();
     }
 
-    channel.send(fetchRequest.underlying());
+    channel.send(fetchRequest);
 
-    OffsetFetchResponse fetchResponse = OffsetFetchResponse.readFrom(channel.receive().buffer());
-    OffsetMetadataAndError result = fetchResponse.offsets().get(partition);
+    OffsetFetchResponse fetchResponse = OffsetFetchResponse.readFrom(channel.receive().payload());
+    OffsetMetadataAndError result = fetchResponse.requestInfo().get(partition).get();
     return result.offset();
   }
 

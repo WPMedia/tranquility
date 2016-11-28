@@ -34,6 +34,7 @@ import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.KafkaException;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -119,9 +120,13 @@ public class Consumer
           writerController.stop();
           Iterator<KafkaConsumer> consumerIterator = polledConsumers.iterator();
           while (consumerIterator.hasNext()) {
-              KafkaConsumer kafkaConsumer = consumerIterator.next();
+            KafkaConsumer kafkaConsumer = consumerIterator.next();
+            try {
               kafkaConsumer.commitSync();
-              consumerIterator.remove();
+            } catch (KafkaException e) {
+              log.error(e, "Failed to sync Kafka consumer commit");
+            }
+            consumerIterator.remove();
           }
         }
         finally {
@@ -158,9 +163,13 @@ public class Consumer
 
       Iterator<KafkaConsumer> consumerIterator = polledConsumers.iterator();
       while (consumerIterator.hasNext()) {
-          KafkaConsumer kafkaConsumer = consumerIterator.next();
+        KafkaConsumer kafkaConsumer = consumerIterator.next();
+        try {
           kafkaConsumer.commitSync();
-          consumerIterator.remove();
+        } catch (KafkaException e) {
+          log.error(e, "Failed to sync Kafka consumer commit");
+        }
+        consumerIterator.remove();
       }
 
       final long finishedTime = System.currentTimeMillis();
